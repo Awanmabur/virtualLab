@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Virtual Chemistry Lab</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(120deg, #e3f0ff 0%, #f4f8fb 100%);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #toolbar {
+      flex: 1;
+      min-width: 240px;
+      background: #fff;
+      border-right: 1px solid #cfd8dc;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
+    }
+    #lab-container {
+      flex: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e3eaf1;
+      padding: 20px;
+    }
+    #canvas-area {
+      width: 700px;
+      height: 420px;
+      background: #f9fdff;
+      border-radius: 16px;
+      border: 2px solid #e3eaf1;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+    }
+    .test-tube {
+      position: absolute;
+      width: 60px;
+      height: 180px;
+      cursor: grab;
+      user-select: none;
+      z-index: 1;
+    }
+    .tube-glass {
+      width: 100%;
+      height: 100%;
+      border: 3px solid #b0bec5;
+      border-radius: 30px 30px 18px 18px/60px 60px 18px 18px;
+      background: linear-gradient(120deg, rgba(255,255,255,0.7) 60%, rgba(200,220,255,0.08));
+      box-shadow: 0 0 16px 2px rgba(180,200,255,0.12) inset;
+      position: absolute;
+      left: 0; top: 0;
+      pointer-events: none;
+    }
+    .tube-liquid {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      width: 44px;
+      height: 0;
+      background: #b3e5fc;
+      border-radius: 0 0 18px 18px;
+      transition: height 0.5s, background 0.5s;
+      z-index: 2;
+      overflow: visible;
+    }
+    .tube-burnable {
+      position: absolute;
+      left: 16px;
+      top: 30px;
+      width: 28px;
+      height: 40px;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .tube-burn-flame {
+      position: absolute;
+      left: 22px;
+      top: 10px;
+      width: 16px;
+      height: 32px;
+      z-index: 4;
+      pointer-events: none;
+      display: none;
+    }
+    .flame-anim {
+      width: 16px;
+      height: 32px;
+      background: radial-gradient(ellipse at center, #fffde4 0%, #ffd740 40%, #ff9800 80%, #e65100 100%);
+      border-radius: 50% 50% 60% 60%/60% 60% 100% 100%;
+      animation: flameFlicker 0.4s infinite alternate;
+      opacity: 0.85;
+    }
+    @keyframes flameFlicker {
+      0% { transform: scaleY(1) scaleX(1); }
+      100% { transform: scaleY(1.1) scaleX(0.95) translateY(-2px);}
+    }
+    .ash {
+      width: 24px;
+      height: 10px;
+      background: #bdbdbd;
+      border-radius: 0 0 10px 10px;
+      margin: 0 auto;
+      margin-top: 30px;
+      opacity: 0.7;
+    }
+    .white-flame {
+      width: 24px;
+      height: 24px;
+      background: radial-gradient(circle, #fff 60%, #e0e0e0 100%);
+      border-radius: 50%;
+      margin: 0 auto;
+      margin-top: 20px;
+      box-shadow: 0 0 24px 8px #fff, 0 0 40px 16px #fffde7;
+      opacity: 0.9;
+      animation: whiteFlame 0.5s infinite alternate;
+    }
+    @keyframes whiteFlame {
+      0% { filter: blur(1px);}
+      100% { filter: blur(3px);}
+    }
+    .char {
+      width: 24px;
+      height: 10px;
+      background: #4e342e;
+      border-radius: 0 0 10px 10px;
+      margin: 0 auto;
+      margin-top: 30px;
+      opacity: 0.7;
+    }
+    .reaction-effect {
+      position: absolute;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .ppt {
+      position: absolute;
+      width: 36px;
+      height: 18px;
+      bottom: 8px;
+      left: 12px;
+      background: repeating-linear-gradient(135deg, #fff, #e0e0e0 10px, #bdbdbd 20px);
+      border-radius: 0 0 12px 12px;
+    }
+    .bubble {
+      width: 10px;
+      height: 10px;
+      background: #fff;
+      border-radius: 50%;
+      position: absolute;
+      animation: bubbleUp 1.2s linear forwards;
+      opacity: 0.7;
+    }
+    @keyframes bubbleUp {
+      0% { bottom: 20px; }
+      100% { bottom: 120px; opacity: 0; }
+    }
+    .chemical-btn, .safety-btn, #add-tube-btn, .burnable-btn, #burn-btn {
+      border: none;
+      border-radius: 6px;
+      padding: 10px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      font-weight: bold;
+      transition: box-shadow 0.2s;
+    }
+    .chemical-btn.selected, .safety-btn.active, .burnable-btn.selected {
+      box-shadow: 0 0 8px rgba(0,0,0,0.13);
+    }
+    .safety-btn { background: #ffe082; }
+    #add-tube-btn { background: #c8e6c9; }
+    .burnable-btn { background: #ffe0b2; margin-right: 6px;}
+    #burn-btn { background: #ffccbc; margin-top: 8px;}
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #toolbar { flex-direction: row; overflow-x: auto; }
+      #lab-container, #canvas-area { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <div>
+      <strong>Instructions</strong>
+      <ol style="font-size: 0.9em; padding-left: 18px;">
+        <li>Wear safety goggles and gloves.</li>
+        <li>Drag test tube into lab.</li>
+        <li>Select and add chemical.</li>
+        <li>Mix and observe reaction.</li>
+        <li>Try burning a tube with a burnable item.</li>
+      </ol>
+    </div>
+    <div>
+      <strong>Chemicals</strong><br>
+      <button class="chemical-btn" data-chem="HCl" style="background:#ffebee;">HCl</button>
+      <button class="chemical-btn" data-chem="NaOH" style="background:#e1f5fe;">NaOH</button>
+      <button class="chemical-btn" data-chem="AgNO3" style="background:#f5f5f5;">AgNO₃</button>
+      <button class="chemical-btn" data-chem="NaCl" style="background:#fffde7;">NaCl</button>
+      <button class="chemical-btn" data-chem="CuSO4" style="background:#e3f2fd;">CuSO₄</button>
+      <button class="chemical-btn" data-chem="DistilledWater" style="background:#e0f7fa;">Water</button>
+    </div>
+    <div>
+      <strong>Burnables</strong><br>
+      <button class="burnable-btn" data-burn="Magnesium">Magnesium</button>
+      <button class="burnable-btn" data-burn="Paper">Paper</button>
+      <button class="burnable-btn" data-burn="WoodSplint">Wood Splint</button>
+      <button id="burn-btn">🔥 Burn Tube</button>
+    </div>
+    <div>
+      <strong>Safety</strong><br>
+      <button class="safety-btn" id="goggles-btn">Goggles</button>
+      <button class="safety-btn" id="gloves-btn">Gloves</button>
+    </div>
+    <button id="add-tube-btn">+ Test Tube</button>
+  </div>
+  <div id="lab-container">
+    <div id="canvas-area" title="Double-click to add tube"></div>
+  </div>
+  <audio id="pour-sound" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124bfae2e2.mp3"></audio>
+  <audio id="bubble-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b6e2e.mp3"></audio>
+  <audio id="burn-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b6e2e.mp3"></audio>
+  <audio id="magnesium-sound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b6e2e.mp3"></audio>
+  <script>
+    const canvas = document.getElementById('canvas-area');
+    let gogglesOn = false, glovesOn = false;
+    let selectedChemical = null;
+    let selectedBurnable = null;
+    let testTubes = [];
+    let selectedTube = null;
+
+    const chemicals = {
+      HCl: { color: "rgba(229,115,115,0.5)", reaction: { NaOH: "neutralization", AgNO3: "none" }},
+      NaOH: { color: "rgba(129,212,250,0.5)", reaction: { HCl: "neutralization", CuSO4: "precipitate" }},
+      AgNO3: { color: "rgba(207,216,220,0.5)", reaction: { NaCl: "precipitate" }},
+      NaCl: { color: "rgba(255,253,231,0.5)", reaction: { AgNO3: "precipitate" }},
+      CuSO4: { color: "rgba(100,181,246,0.5)", reaction: { NaOH: "precipitate" }},
+      DistilledWater: { color: "rgba(225,245,254,0.3)", reaction: {} }
+    };
+
+    const burnables = {
+      Magnesium: { name: "Magnesium Ribbon", color: "#bdbdbd", burn: "white-flame" },
+      Paper: { name: "Paper", color: "#ffe0b2", burn: "ash" },
+      WoodSplint: { name: "Wood Splint", color: "#bcaaa4", burn: "char" }
+    };
+
+    function addTestTube(x = 100, y = 100) {
+      const tube = document.createElement('div');
+      tube.className = 'test-tube';
+      tube.style.left = x + 'px';
+      tube.style.top = y + 'px';
+      tube.innerHTML = `
+        <div class="tube-glass"></div>
+        <div class="tube-liquid"></div>
+        <div class="tube-burnable"></div>
+        <div class="reaction-effect"></div>
+        <div class="tube-burn-flame"></div>
+      `;
+      tube.chemicals = [];
+      tube.burnable = null;
+      tube.isBurning = false;
+      canvas.appendChild(tube);
+      testTubes.push(tube);
+
+      // Drag functionality
+      let offsetX, offsetY, dragging = false;
+      tube.addEventListener('mousedown', e => {
+        dragging = true;
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+        tube.style.zIndex = 10;
+        document.body.style.userSelect = "none";
+        selectedTube = tube;
+      });
+      document.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        const rect = canvas.getBoundingClientRect();
+        let nx = e.clientX - rect.left - offsetX;
+        let ny = e.clientY - rect.top - offsetY;
+        nx = Math.max(0, Math.min(nx, canvas.clientWidth - tube.offsetWidth));
+        ny = Math.max(0, Math.min(ny, canvas.clientHeight - tube.offsetHeight));
+        tube.style.left = nx + 'px';
+        tube.style.top = ny + 'px';
+      });
+      document.addEventListener('mouseup', () => {
+        if (dragging) {
+          dragging = false;
+          tube.style.zIndex = '';
+          document.body.style.userSelect = "";
+        }
+      });
+
+      tube.addEventListener('dblclick', () => {
+        if (tube.chemicals.length === 0 && !tube.burnable) {
+          canvas.removeChild(tube);
+          testTubes = testTubes.filter(t => t !== tube);
+        }
+      });
+
+      tube.addEventListener('click', e => {
+        selectedTube = tube;
+        // Add chemical
+        if (selectedChemical) {
+          if (!gogglesOn || !glovesOn) {
+            alert("Please wear safety goggles and gloves before handling chemicals!");
+            return;
+          }
+          addChemical(tube, selectedChemical);
+        }
+        // Add burnable
+        if (selectedBurnable) {
+          addBurnable(tube, selectedBurnable);
+        }
+      });
+    }
+
+    function addChemical(tube, chemKey) {
+      const chem = chemicals[chemKey];
+      if (!chem) return;
+      document.getElementById('pour-sound').currentTime = 0;
+      document.getElementById('pour-sound').play();
+      tube.chemicals.push(chemKey);
+      let liquid = tube.querySelector('.tube-liquid');
+      liquid.style.height = (tube.chemicals.length * 30) + 'px';
+      liquid.style.background = chem.color;
+
+      // Handle reaction
+      if (tube.chemicals.length >= 2) {
+        const [c1, c2] = tube.chemicals.slice(-2);
+        const reaction = chemicals[c1].reaction[c2] || chemicals[c2].reaction[c1];
+        if (reaction === "neutralization") {
+          liquid.style.background = "#b2ffb2";
+          bubbleEffect(liquid);
+          document.getElementById('bubble-sound').currentTime = 0;
+          document.getElementById('bubble-sound').play();
+          showReactionEffect(tube, "neutralization");
+        } else if (reaction === "precipitate") {
+          let ppt = document.createElement('div');
+          ppt.className = 'ppt';
+          liquid.appendChild(ppt);
+          showReactionEffect(tube, "precipitate");
+        }
+      }
+    }
+
+    function bubbleEffect(liquid) {
+      for (let i = 0; i < 5; i++) {
+        let bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.style.left = `${10 + Math.random() * 20}px`;
+        liquid.appendChild(bubble);
+        setTimeout(() => bubble.remove(), 1200);
+      }
+    }
+
+    function showReactionEffect(tube, type) {
+      const effect = tube.querySelector('.reaction-effect');
+      effect.innerHTML = "";
+      if (type === "neutralization") {
+        effect.innerHTML = `<div style="position:absolute;left:10px;top:60px;width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,#b2ffb2 60%,#fff 100%);opacity:0.7;animation:pop 0.7s;"></div>`;
+      } else if (type === "precipitate") {
+        effect.innerHTML = `<div style="position:absolute;left:18px;top:120px;width:24px;height:16px;border-radius:8px;background:#bdbdbd;opacity:0.7;animation:pop 0.7s;"></div>`;
+      }
+      setTimeout(() => { effect.innerHTML = ""; }, 800);
+    }
+
+    function addBurnable(tube, burnKey) {
+      if (tube.burnable) return;
+      const burn = burnables[burnKey];
+      if (!burn) return;
+      tube.burnable = burnKey;
+      const burnDiv = tube.querySelector('.tube-burnable');
+      burnDiv.innerHTML = `<div style="width:24px;height:32px;margin:0 auto;margin-top:4px;background:${burn.color};border-radius:4px;"></div>`;
+    }
+
+    function burnTube(tube) {
+      if (!tube || !tube.burnable || tube.isBurning) return;
+      tube.isBurning = true;
+      const burnKey = tube.burnable;
+      const burn = burnables[burnKey];
+      const burnDiv = tube.querySelector('.tube-burnable');
+      const flameDiv = tube.querySelector('.tube-burn-flame');
+      flameDiv.innerHTML = "";
+      flameDiv.style.display = "block";
+      if (burn.burn === "white-flame") {
+        flameDiv.innerHTML = `<div class="flame-anim"></div>`;
+        document.getElementById('magnesium-sound').currentTime = 0;
+        document.getElementById('magnesium-sound').play();
+        setTimeout(() => {
+          flameDiv.style.display = "none";
+          burnDiv.innerHTML = `<div class="white-flame"></div>`;
+          tube.burnable = null;
+          tube.isBurning = false;
+        }, 1800);
+      } else if (burn.burn === "ash") {
+        flameDiv.innerHTML = `<div class="flame-anim"></div>`;
+        document.getElementById('burn-sound').currentTime = 0;
+        document.getElementById('burn-sound').play();
+        setTimeout(() => {
+          flameDiv.style.display = "none";
+          burnDiv.innerHTML = `<div class="ash"></div>`;
+          tube.burnable = null;
+          tube.isBurning = false;
+        }, 1500);
+      } else if (burn.burn === "char") {
+        flameDiv.innerHTML = `<div class="flame-anim"></div>`;
+        document.getElementById('burn-sound').currentTime = 0;
+        document.getElementById('burn-sound').play();
+        setTimeout(() => {
+          flameDiv.style.display = "none";
+          burnDiv.innerHTML = `<div class="char"></div>`;
+          tube.burnable = null;
+          tube.isBurning = false;
+        }, 1500);
+      }
+    }
+
+    // Event bindings
+    document.querySelectorAll('.chemical-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.chemical-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedChemical = btn.dataset.chem;
+        selectedBurnable = null;
+        document.querySelectorAll('.burnable-btn').forEach(b => b.classList.remove('selected'));
+      };
+    });
+    document.querySelectorAll('.burnable-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.burnable-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedBurnable = btn.dataset.burn;
+        selectedChemical = null;
+        document.querySelectorAll('.chemical-btn').forEach(b => b.classList.remove('selected'));
+      };
+    });
+    document.getElementById('burn-btn').onclick = () => {
+      if (!gogglesOn || !glovesOn) {
+        alert("Please wear safety goggles and gloves before burning!");
+        return;
+      }
+      if (!selectedTube) {
+        alert("Select a test tube by clicking it first.");
+        return;
+      }
+      burnTube(selectedTube);
+    };
+    document.getElementById('goggles-btn').onclick = function () {
+      gogglesOn = !gogglesOn;
+      this.classList.toggle('active');
+    };
+    document.getElementById('gloves-btn').onclick = function () {
+      glovesOn = !glovesOn;
+      this.classList.toggle('active');
+    };
+    document.getElementById('add-tube-btn').onclick = () => {
+      addTestTube(100 + Math.random() * 400, 100 + Math.random() * 200);
+    };
+    canvas.ondblclick = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      addTestTube(e.clientX - rect.left - 30, e.clientY - rect.top - 90);
+    };
+    // Initial tubes
+    addTestTube(150, 100);
+    addTestTube(300, 100);
+  </script>
+</body>
+</html>
